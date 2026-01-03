@@ -44,7 +44,7 @@ These instructions assume you're on Windows (PowerShell) and have Python 3.10+ i
 1. Clone the repository
 
    git clone https://github.com/1heChosenOne/RAG-system-api
-   cd "<YOUR path to directory>"
+   cd "`YOUR path to directory`"
 
 2. Create and activate a virtual environment
 
