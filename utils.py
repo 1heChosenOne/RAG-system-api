@@ -15,7 +15,7 @@ groq_api_key=os.getenv("GROQ_API_KEY")
 groq_client = Groq(api_key=groq_api_key)
 jwt_secret_key=os.getenv("JWT_SECRET_KEY")
 
-config=AuthXConfig(JWT_ACCESS_TOKEN_EXPIRES= 60 * 60)#can be changed for your preferences
+config=AuthXConfig(JWT_ACCESS_TOKEN_EXPIRES= 60 * 60)#in seconds(can be changed for your preferences)
 config.JWT_SECRET_KEY=jwt_secret_key
 config.JWT_ACCESS_COOKIE_NAME="my_access_token"
 config.JWT_TOKEN_LOCATION=["cookies"]
