@@ -1,21 +1,22 @@
 from authx import AuthX, AuthXConfig 
-import bcrypt
+from tiktoken import encoding_for_model
+from sentence_transformers import SentenceTransformer
 from sqlalchemy import text
 from fastapi import HTTPException, Request
-import re
 from pathlib import Path
 from dotenv import load_dotenv
-import os
 from groq import Groq
+import bcrypt, re, os
 
 
 
 load_dotenv()
-groq_api_key=os.getenv("GROQ_API_KEY")
+groq_api_key = os.getenv("GROQ_API_KEY")
 groq_client = Groq(api_key=groq_api_key)
-jwt_secret_key=os.getenv("JWT_SECRET_KEY")
+jwt_secret_key = os.getenv("JWT_SECRET_KEY")
 
-config=AuthXConfig(JWT_ACCESS_TOKEN_EXPIRES= 60 * 60)#in seconds(can be changed for your preferences)
+# Authentification
+config = AuthXConfig(JWT_ACCESS_TOKEN_EXPIRES= 60 * 60) # in seconds(can be changed for your preferences)
 config.JWT_SECRET_KEY=jwt_secret_key
 config.JWT_ACCESS_COOKIE_NAME="my_access_token"
 config.JWT_TOKEN_LOCATION=["cookies"]
@@ -27,18 +28,25 @@ auth.set_callback_get_model_instance(lambda subject,**kwargs:subject)
 
 BASE_PATH = Path("data/users")
 
+# Embedding tokenizer and model used by services
+enc = encoding_for_model("text-embedding-3-small")
+emb_model = SentenceTransformer('all-MiniLM-L6-v2')
+
+# System prompt for RAG chat
+system_prompt="""
+You are a context-bound assistant in a RAG system.
+Use ONLY the provided context   .
+If the answer is not in the context, say:
+"I don't know based on the provided documents."
+"""
+
 def password_in_hash(password:str):
-    salt=bcrypt.gensalt()
-    hashed=bcrypt.hashpw(password.encode(),salt)
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode(),salt)
     return hashed.decode()
 
 def verify_hash(password: str, hashed: str):
     return bcrypt.checkpw(password.encode(), hashed.encode())
-
-async def get_owner_id(email,conn):
-    res=await conn.execute(text("""SELECT id FROM users WHERE email=:email"""),{"email":email})
-    owner_id=res.scalar_one_or_none()
-    return owner_id
     
 async def check_current_token(request: Request):
     try:
