@@ -9,13 +9,21 @@ This repository is intended for developers and researchers who want a lightweigh
 
 Repository Structure
 --------------------
-- classes.py              - Core data classes and lightweight models used by the application.
-- db.py                   - Database utility functions and simple persistence helpers.
-- utils.py                - Helper utilities (text processing, embedding wrappers, IO helpers).
-- main.py                 - Main application entrypoint / example runner.
-- requirements.txt        - Python package dependencies.
-- README.md               - This file (project overview, setup and usage).
-- LICENSE                 - Project license.
+- `schemas.py`: Pydantic models and request/response schemas used by API routes.
+- `db.py`: Database helpers — connection provider, table creation and light SQL utilities (Postgres + SQLAlchemy).
+- `utils.py`: Shared utilities — tokenization/encoding, embedding model instance, AuthX setup, filename validation, and `data/users/` path helpers.
+- `main.py`: Application entrypoint — creates FastAPI app, registers routers and exception handlers, and runs example flows.
+- `requirements.txt`: Python package dependencies for the project.
+- `README.md`: Project overview, setup, and usage (this file).
+- `LICENSE`: Project license.
+- `infra/`: Infrastructure helpers:
+  - `indexer.py` (FAISS index create/load/search)
+  - `embeddings.py` (embedding wrappers)
+  - `groq.py` (Groq LLM integration)
+- `repos/`: Database repository layer (e.g., `files.py` managing file and chunk DB operations).
+- `routes/`: FastAPI route modules (e.g., `files.py` exposing the public API endpoints).
+- `services/`: Business logic services (e.g., `auth.py` for auth, `profile.py` for file workflows).
+- `exceptions.py` and `exception_handlers.py`: Custom exceptions and FastAPI handlers to standardize error responses.
 
 Key Features
 ------------
@@ -27,15 +35,15 @@ Endpoints
 ---------
 - GET /my_files: Returns list of files for the authenticated user. Requires auth (cookie token). Query params: none. Response: list of file records or {"msg":"no loaded files on server"}.
 
--   POST /sign_up: Register a new user. Body: pass_and_email (email, password). Response: {"msg":"Succesful registation"} or error for duplicate email.
+- POST /sign_up: Register a new user. Body: `PassEmail` (email, password). Response: {"msg":"Succesful registation"} or error for duplicate email.
 
-- POST /log_in: Log in and set access cookie. Body: pass_and_email (email, password). Response: cookie set + success message or error.
+- POST /log_in: Log in and set access cookie. Body: `PassEmail` (email, password). Response: cookie set (cookie name: `my_access_token`) + success message or error.
 
-- POST /addfile: Upload a .txt file, chunk it, compute embeddings, build per-user FAISS index and store file record. Requires auth. Form file: UploadFile. Response: {"msg":"file added succesfully with id <id> and anme <name>"}.
+- POST /addfile: Upload a `.txt` file (only `.txt` allowed). The file is chunked, embeddings are computed, a per-user FAISS index is written and file/chunk records are stored in the DB. Requires auth. Form file: `UploadFile`. Response: {"msg":"file added successfully with id <id> and name <name>"}.
 
-- DELETE /delete_file: Delete a file by file_id (int) for the authenticated user. Requires auth. Response: success or not-found message; removes FAISS index file if present.
+- DELETE /delete_file: Delete a file by `file_id` (int) for the authenticated user. Requires auth. Response: success or not-found message; removes FAISS index file at `data/users/user_{owner_id}/index_faiss_{file_id}.faiss` if present.
 
-- POST /chat: Run a retrieval + LLM completion against a specific file. Requires auth. Body: file_and_question (file_id, question). Returns LLM text (uses Groq client) or error messages if file/index missing.
+- POST /chat: Run retrieval + LLM completion against a specific file. Requires auth. Body: `FileQuestion` (file_id, question). Returns LLM text (via Groq client) or error messages if file/index missing.
 
 Getting Started (Windows)
 -------------------------
@@ -65,9 +73,9 @@ These instructions assume you're on Windows (PowerShell) and have Python 3.10+ i
 
 Configuration & Environment
 ---------------------------
-- requirements.txt: install the listed packages.
-- Environment variables: JWT_SECRET_KEY, GROQ_API_KEY ,DB_URL variables should be added in .env file 
-- And by the way you can choose the token expiration time on utils.py
+- `requirements.txt`: install the listed packages.
+- Environment variables: add `JWT_SECRET_KEY`, `GROQ_API_KEY`, and `DB_URL` to a `.env` file. The Groq API key is used by the Groq client; the JWT secret is used by AuthX.
+- Token expiration and cookie name are configurable in `utils.py` (`AuthXConfig`); by default the access cookie name is `my_access_token` and expiration is set in seconds.
 
 Usage
 -----
@@ -82,25 +90,74 @@ Typical commands (examples):
 
   python main.py --user user_1 --query "How do I reset my password?"
 
-(Check `main.py` for exact CLI flags or replace with direct function calls for programmatic usage or use uvicorn to host on local adress)
+(Check `main.py` for exact CLI flags or replace with direct function calls for programmatic usage or use uvicorn to host on local address)
 
 Code Walkthrough
 ----------------
-- `classes.py`:
-  - Contains data classes for documents, index metadata, and query results.
+- `schemas.py`  
+  Core Pydantic data classes and lightweight models used throughout the application, including:
+  - Documents  
+  - Index metadata  
+  - Query results  
 
-- `db.py`:
-  - Functions for creating database ,creating tables in postgres and get connection function
+- `db.py`  
+  Database helper functions and utilities:
+  - Connection provider  
+  - Table creation helpers  
+  - Simple SQL utilities  
+  Supports PostgreSQL via SQLAlchemy.  
 
-- `utils.py`:
-  - Preprocessing, text normalization, embedding wrappers (local/provider-agnostic), validation and helper functions for building FAISS indexes.
+- `utils.py`  
+  Shared utility functions across the project, including:
+  - Text tokenization and encoding  
+  - Embedding model instance management  
+  - Authentication configuration (AuthX)  
+  - Filename validation  
+  - Helpers for managing `data/users/` paths  
 
 - `main.py`:
-  - Script that ties together index loading, querying, and printing results. Use this as a starting point to build integrations or UI wrappers.
+  - Entry point of the FastAPI application.
+  - Initializes the FastAPI app instance.
+  - Includes `files` router to expose all API endpoints.
+  - Registers global exception handlers via `register_handlers(app)`.
+  - Performs startup tasks such as creating necessary database tables.
+
+- `infra/`  
+  - `indexer.py`: Functions to create, load, and search FAISS indexes  
+  - `embeddings.py`: Wrapper around embedding model (`sentence-transformers`) with helper functions like `np_embed_texts` and `embed_text`  
+  - `groq.py`: Groq client integration and `chat_response` function to prepare prompts and call the LLM  
+
+- `repos/`  
+  - `files.py`: Database access layer for files and chunks, supporting insert, select, and delete operations used by services  
+
+- `routes/`  
+  - `files.py`: FastAPI routes exposing main API endpoints:
+    - `/sign_up`  
+    - `/log_in`  
+    - `/addfile`  
+    - `/delete_file`  
+    - `/my_files`  
+    - `/chat`  
+
+- `services/`  
+  - `auth.py`: Handles user registration and login, including:
+    - Password hashing  
+    - Token/cookie management  
+  - `profile.py`: High-level business logic for file upload (chunking, storing chunks, building indexes), retrieval (`chat` flow), listing, and deletion  
+
+- `exceptions.py` and `exception_handlers.py`  
+  Custom exception types and FastAPI exception handlers to standardize error responses across the API  
 
 Data and Indexes
 ----------------
-The `data/users/` directory contains per-user FAISS index files.
+The `data/users/` directory contains per-user FAISS index files. Index files follow the pattern:
+
+`data/users/user_{owner_id}/index_faiss_{file_id}.faiss`
+
+Notes:
+- Only `.txt` uploads are accepted and the service chunks text before embedding (defaults: chunk_size=300 tokens, overlap=70 tokens).
+- Embeddings use `sentence-transformers` model `all-MiniLM-L6-v2` and tokenizer `text-embedding-3-small` is used for tokenization in the chunking pipeline.
+- The project uses Groq for LLM completions (model configured in `infra/groq.py`, e.g. `llama-3.3-70b-versatile`).
 
 Security & Privacy
 ------------------

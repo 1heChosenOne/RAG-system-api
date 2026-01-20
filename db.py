@@ -6,7 +6,7 @@ import os
 load_dotenv()
 db_url = os.getenv("DB_URL")
 
-engine=create_async_engine(db_url)
+engine = create_async_engine(db_url)
 
 async def get_conn():
     async with engine.connect() as conn:
