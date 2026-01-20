@@ -1,4 +1,5 @@
 # RAG-system-api
+https://github.com/user-attachments/assets/2f3d86e1-8f12-4e15-a439-3396c493a53d
 Overview
 --------
 RAG system api is an API of Retrieval-Augmented Generation (RAG) system implemented in Python. The project demonstrates building and querying vector indexes for user-specific document stores, providing a structure for experimenting with local embeddings, FAISS indexes, and simple retrieval workflows integrated into a Python application.
