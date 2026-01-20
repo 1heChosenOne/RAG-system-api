@@ -22,7 +22,7 @@ async def sign_up(email,password,conn):
     password_hash=password_in_hash(password)
     
     try:
-        files_repo.insert_user(email,password_hash,conn)
+        await files_repo.insert_user(email,password_hash,conn)
 
     except IntegrityError as e:
         if "unique constraint" in str(e.orig):
